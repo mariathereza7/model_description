@@ -1,0 +1,6 @@
+pose_controller:
+  ros__parameters:
+    kp_x: 1.0
+    kp_y: 1.0
+    kp_theta: 2.0
+    tolerance: 0.05
