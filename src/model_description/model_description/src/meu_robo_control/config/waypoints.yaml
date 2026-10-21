@@ -1,0 +1,5 @@
+mission_node:
+  ros__parameters:
+    # Sequência de triplas x [m], y [m], yaw [rad].
+    waypoints: [0.0, 0.0, 0.0, 2.0, 0.0, 1.57, 2.0, 2.0, 3.14, 0.0, 2.0, 0.0]
+    acc_rad: 0.15

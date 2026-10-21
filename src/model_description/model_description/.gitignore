@@ -1,0 +1,14 @@
+# ROS 2 build artifacts
+build/
+install/
+log/
+
+# Python / Setuptools
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# IDEs
+.vscode/
+.idea/

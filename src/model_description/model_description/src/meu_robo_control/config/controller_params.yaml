@@ -1,0 +1,9 @@
+pose_control_node:
+  ros__parameters:
+    kp_x: 1.0
+    kp_y: 1.0
+    kp_theta: 2.0
+    tolerance: 0.05
+    yaw_tolerance: 0.05
+    max_linear_speed: 0.4
+    max_angular_speed: 1.5
