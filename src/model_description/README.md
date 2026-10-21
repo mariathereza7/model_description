@@ -465,5 +465,30 @@ Y ≈ (latitude  - latitude_0) · R
 Z = altitude - altitude_0
 ```
 
-com os ângulos em radianos e `R = 6378137 m`. O tópico `/gps/fix` fornece `latitude`, `longitude` e `altitude`; a conversão para `(X,Y,Z)` ainda deve ser feita por um nó específico caso seja necessária no exercício.
+com os ângulos em radianos e `R = 6378137 m`. O nó `gps_to_local_node` já realiza essa conversão e publica `geometry_msgs/msg/PointStamped` em `/gps/position_local`.
+
+Para executá-lo, escolha a origem geográfica do seu cenário. Por exemplo:
+
+```bash
+ros2 run meu_robo_control gps_to_local_node --ros-args \
+  -p use_sim_time:=true \
+  -p origin_latitude:=-23.550520 \
+  -p origin_longitude:=-46.633308 \
+  -p origin_altitude:=760.0
+```
+
+Ou use o arquivo de parâmetros e o launch:
+
+```bash
+ros2 launch meu_robo_control gps.launch.py
+```
+
+Edite `config/gps_params.yaml` antes de iniciar para colocar a latitude, longitude e altitude da origem. O resultado pode ser verificado com:
+
+```bash
+ros2 topic type /gps/position_local
+ros2 topic echo /gps/position_local
+```
+
+Nesse frame ENU local, `X` é Leste, `Y` é Norte e `Z` é altitude relativa à origem, todos em metros.
 

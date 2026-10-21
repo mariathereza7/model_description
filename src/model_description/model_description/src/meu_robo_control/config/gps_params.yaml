@@ -1,0 +1,7 @@
+gps_to_local_node:
+  ros__parameters:
+    # Origem do frame local ENU: latitude [graus], longitude [graus], altitude [m].
+    origin_latitude: 0.0
+    origin_longitude: 0.0
+    origin_altitude: 0.0
+    earth_radius: 6378137.0

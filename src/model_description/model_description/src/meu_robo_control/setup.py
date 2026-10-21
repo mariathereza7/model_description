@@ -28,6 +28,7 @@ setup(
             'pose_control_node = meu_robo_control.pose_control_node:main',
             'mission_node = meu_robo_control.mission_node:main',
             'trajectory_node = meu_robo_control.trajectory_node:main',
+            'gps_to_local_node = meu_robo_control.gps_to_local_node:main',
         ],
     },
 )
