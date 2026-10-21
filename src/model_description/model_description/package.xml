@@ -9,6 +9,7 @@
 
   <depend>rclpy</depend>
   <depend>gazebo_ros</depend>
+  <depend>gazebo_plugins</depend>
   <depend>robot_state_publisher</depend>
   <depend>controller_manager</depend>
   <depend>launch</depend>

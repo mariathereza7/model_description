@@ -292,3 +292,178 @@ pkill -f gzserver
 ros2 launch model_description full_robot.launch.py
 ```
 
+## Prática 04 — Sensores
+
+### Exercício 1.1 — Adicionar sensores
+
+O URDF agora inclui quatro sensores Gazebo ROS 2, cada um com um link visual próprio:
+
+| Sensor | Link visual | Tópico | Tipo de mensagem | Frequência |
+|---|---|---|---|---:|
+| IMU | `imu_link` | `/imu/data` | `sensor_msgs/msg/Imu` | 100 Hz |
+| GPS | `gps_link` | `/gps/fix` | `sensor_msgs/msg/NavSatFix` | 10 Hz |
+| Câmera RGB frontal | `camera_link` | `/camera/image_raw` | `sensor_msgs/msg/Image` | 30 Hz |
+| Câmera RGB frontal | `camera_link` | `/camera/camera_info` | `sensor_msgs/msg/CameraInfo` | 30 Hz |
+| Lidar 2D frontal | `lidar_link` | `/scan` | `sensor_msgs/msg/PointCloud2` | 15 Hz |
+
+Os sensores aparecem no robô como caixas coloridas: IMU azul, GPS amarelo, câmera preta e lidar verde. O Gazebo também mostra os feixes dos sensores quando `visualize` está habilitado.
+
+Todos os sensores possuem ruído gaussiano configurado no URDF:
+
+- IMU: ruído separado para orientação, velocidade angular e aceleração linear;
+- GPS: ruído horizontal e vertical em metros;
+- câmera: ruído gaussiano de imagem;
+- lidar: ruído gaussiano nas distâncias.
+
+### Verificar os sensores
+
+Compile novamente o pacote depois de alterar o URDF:
+
+```bash
+source /opt/ros/humble/setup.bash
+cd ~/ros2_ws
+colcon build \
+  --base-paths src/model_description/model_description \
+  --packages-select model_description \
+  --symlink-install
+source install/setup.bash
+```
+
+Reinicie o Gazebo para recarregar o modelo:
+
+```bash
+pkill -f gzclient
+pkill -f gzserver
+ros2 launch model_description full_robot.launch.py
+```
+
+Liste os tópicos dos sensores:
+
+```bash
+ros2 topic list | grep -E '/imu|/gps|/camera|/scan'
+```
+
+Confira os tipos:
+
+```bash
+ros2 topic type /imu/data
+ros2 topic type /gps/fix
+ros2 topic type /camera/image_raw
+ros2 topic type /camera/camera_info
+ros2 topic type /scan
+```
+
+Veja uma medição de cada sensor:
+
+```bash
+ros2 topic echo /imu/data --once
+ros2 topic echo /gps/fix --once
+ros2 topic echo /camera/camera_info --once
+ros2 topic echo /scan --once
+```
+
+Para visualizar a imagem RGB, instale e execute o `rqt_image_view`:
+
+```bash
+sudo apt install ros-humble-rqt-image-view
+ros2 run rqt_image_view rqt_image_view
+```
+
+Na janela, selecione `/camera/image_raw`. Para visualizar o PointCloud2 do lidar no RViz2:
+
+```bash
+rviz2
+```
+
+Adicione displays `Image` e `PointCloud2`, usando respectivamente `/camera/image_raw` e `/scan`.
+
+### Exercício 1.2 — Visualização dos dados dos sensores
+
+#### PlotJuggler — IMU e GPS
+
+Com o Gazebo e os sensores em execução, abra o PlotJuggler:
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+ros2 run plotjuggler plotjuggler
+```
+
+Na seção `Streaming`, selecione `ROS2 Topic Subscriber`, clique em `Start` e adicione:
+
+```text
+/imu/data
+/gps/fix
+```
+
+No tópico `/imu/data`, visualize:
+
+```text
+orientation → x, y, z, w
+angular_velocity → x, y, z
+linear_acceleration → x, y, z
+```
+
+No tópico `/gps/fix`, visualize:
+
+```text
+latitude
+longitude
+altitude
+position_covariance[0]
+position_covariance[4]
+position_covariance[8]
+```
+
+Para confirmar as frequências de publicação:
+
+```bash
+ros2 topic hz /imu/data
+ros2 topic hz /gps/fix
+```
+
+#### RViz2 — câmera RGB e lidar
+
+Abra o RViz2:
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+rviz2
+```
+
+Configure `Fixed Frame` como `base_link`. Adicione um display `Image` com o tópico:
+
+```text
+/camera/image_raw
+```
+
+Esse display mostra a imagem RGB frontal. Adicione um display `PointCloud2` com:
+
+```text
+/scan
+```
+
+Use `Style: Points` e um tamanho de ponto aproximado de `0.03`. O lidar deve aparecer como uma nuvem de pontos no arco frontal do robô.
+
+Verifique os tipos e frequências:
+
+```bash
+ros2 topic type /camera/image_raw
+ros2 topic type /scan
+ros2 topic hz /camera/image_raw
+ros2 topic hz /scan
+```
+
+Os tipos esperados são `sensor_msgs/msg/Image` e `sensor_msgs/msg/PointCloud2`. Se os sensores não aparecerem na posição correta, adicione um display `TF` e confira os frames `base_link`, `camera_link` e `lidar_link`.
+
+Para converter a posição global do GPS para coordenadas locais `(X,Y,Z)`, use a origem geográfica como referência e aplique a aproximação local:
+
+```text
+X ≈ (longitude - longitude_0) · cos(latitude_0) · R
+Y ≈ (latitude  - latitude_0) · R
+Z = altitude - altitude_0
+```
+
+com os ângulos em radianos e `R = 6378137 m`. O tópico `/gps/fix` fornece `latitude`, `longitude` e `altitude`; a conversão para `(X,Y,Z)` ainda deve ser feita por um nó específico caso seja necessária no exercício.
+
