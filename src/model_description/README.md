@@ -81,6 +81,43 @@ Verifique a odometria:
 ros2 topic echo /diff_drive_base_controller/odom --once
 ```
 
+### Alternativa para WSL ou problemas gráficos
+
+Se a janela do Gazebo ficar preta, vazia ou se houver mais de uma instância antiga do servidor, encerre os processos antes de iniciar:
+
+```bash
+pkill -f gzclient
+pkill -f gzserver
+pkill -f spawner
+```
+
+Inicie somente o servidor Gazebo, sem a interface gráfica:
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+
+ros2 launch model_description full_robot.launch.py gui:=false
+```
+
+O terminal deve informar que o robô foi criado e que os dois controladores foram ativados. Em outro terminal, abra apenas o cliente gráfico com renderização por software:
+
+```bash
+source /opt/ros/humble/setup.bash
+export GAZEBO_MASTER_URI=http://localhost:11345
+export LIBGL_ALWAYS_SOFTWARE=1
+
+gzclient --verbose
+```
+
+Confirme que há somente um servidor ativo:
+
+```bash
+pgrep -af gzserver
+```
+
+Se o comando retornar mais de um processo, encerre as instâncias antigas e repita o procedimento. Essa alternativa separa problemas do servidor Gazebo de problemas de renderização do `gzclient` no WSLg.
+
 ## Exercício 1.1 — Controle de pose contínuo
 
 O nó é `pose_control_node`. Ele recebe uma meta em `/goal_pose`, lê a odometria e publica `Twist` em `/cmd_vel`. O launch remapeia esses tópicos para o controlador do Gazebo.
@@ -125,13 +162,69 @@ O controlador usa a classe `PID` do módulo reutilizável `meu_robo_control/pid_
 
 ## Exercício 1.1 — Bônus: três manobras
 
-O projeto atual não possui um nó separado para a sequência rotação–translação–rotação. Essa parte deve ser implementada como uma máquina de estados que:
+O nó `maneuver_pose_node` executa cada meta como uma máquina de estados:
 
-1. gira até o ângulo do ponto;
+1. gira até apontar para o waypoint;
 2. avança até a posição;
 3. gira até a orientação final.
 
-Depois de implementada, ela deve publicar no mesmo `cmd_vel` com um launch separado para poder ser comparada ao controle contínuo.
+Compile os pacotes, se necessário:
+
+```bash
+source /opt/ros/humble/setup.bash
+cd ~/ros2_ws
+
+colcon build \
+  --base-paths src/model_description/model_description \
+  --packages-select model_description \
+  --symlink-install
+
+colcon build \
+  --base-paths src/model_description/model_description/src/meu_robo_control \
+  --packages-select meu_robo_control \
+  --symlink-install
+
+source install/setup.bash
+```
+
+Em um primeiro terminal, inicie o Gazebo e os controladores:
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+ros2 launch model_description full_robot.launch.py
+```
+
+Confirme que os controladores estão ativos:
+
+```bash
+ros2 control list_controllers
+```
+
+O resultado esperado contém:
+
+```text
+diff_drive_base_controller active
+joint_state_broadcaster active
+```
+
+Em um segundo terminal, execute a missão com o controlador de três manobras:
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+ros2 launch meu_robo_control maneuver_mission.launch.py
+```
+
+Os waypoints são carregados de `config/waypoints.yaml`. Para acompanhar os comandos enviados:
+
+```bash
+ros2 topic echo /diff_drive_base_controller/cmd_vel_unstamped
+```
+
+O terminal do `maneuver_pose_node` informa as transições entre `rotate_initial`, `translate` e `rotate_final`. Não execute `mission.launch.py`, teleop ou `trajectory.launch.py` ao mesmo tempo, pois todos podem publicar comandos no mesmo controlador.
+
+Os parâmetros estão em `config/maneuver_params.yaml`. O nó publica no mesmo controlador diferencial, portanto não deve ser executado junto com `mission.launch.py` ou com `trajectory.launch.py`.
 
 ## Exercício 1.2 — Seguimento de missão
 
@@ -169,6 +262,44 @@ ros2 topic echo /diff_drive_base_controller/odom
 ```
 
 O valor `acc_rad` é uma tolerância em metros. Um valor típico é `0.15`; ele não controla a velocidade.
+
+### (Bônus) Compare o seguimento de uma missão usando o controle de pose com três manobras e o contínuo
+
+Execute a mesma missão duas vezes, sempre iniciando o robô na mesma pose e usando o mesmo `waypoints.yaml`.
+
+| Critério | Controle contínuo | Três manobras |
+|---|---|---|
+| Suavidade | Maior | Menor |
+| Paradas entre pontos | Poucas ou nenhuma | Rotação e translação separadas |
+| Facilidade de implementação | Média | Alta |
+| Precisão da orientação final | Depende dos ganhos PID | Controlada explicitamente |
+| Adequação para trajetória em oito | Melhor | Inadequada |
+| Adequação para waypoints discretos | Boa | Boa |
+| Velocidade do percurso | Geralmente maior | Geralmente menor |
+| Sensibilidade aos ganhos | Maior | Menor |
+
+Controle contínuo:
+
+```bash
+ros2 launch meu_robo_control mission.launch.py
+```
+
+Controle com três manobras:
+
+```bash
+ros2 launch meu_robo_control maneuver_mission.launch.py
+```
+
+Não execute os dois ao mesmo tempo. Compare no PlotJuggler:
+
+```text
+/diff_drive_base_controller/odom/pose/pose/position/x
+/diff_drive_base_controller/odom/pose/pose/position/y
+/diff_drive_base_controller/odom/twist/twist/linear/x
+/diff_drive_base_controller/odom/twist/twist/angular/z
+```
+
+Os principais critérios experimentais são o tempo total da missão, o erro de posição e orientação em cada waypoint, a velocidade máxima, a distância percorrida, a quantidade de paradas e a suavidade dos comandos.
 
 ## Exercício 2.1 — Trajetória em oito
 
