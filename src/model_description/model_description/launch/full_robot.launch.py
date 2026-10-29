@@ -23,7 +23,8 @@ def generate_launch_description():
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             os.path.join(get_package_share_directory('gazebo_ros'), 'launch', 'gazebo.launch.py')
-        ])
+        ]),
+        launch_arguments={'server_required': 'true'}.items(),
     )
 
     # 2. Publica o robot_description
@@ -46,14 +47,14 @@ def generate_launch_description():
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["joint_state_broadcaster"],
+        arguments=["joint_state_broadcaster", "--controller-manager-timeout", "60", "--service-call-timeout", "60"],
     )
 
     # 5. Spawner do Diff Drive Controller
     diff_drive_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["diff_drive_base_controller"],
+        arguments=["diff_drive_base_controller", "--controller-manager-timeout", "60", "--service-call-timeout", "60"],
     )
 
     # 6. Nó de controle por teclado (teleop_twist_keyboard)

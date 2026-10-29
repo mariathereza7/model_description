@@ -148,7 +148,7 @@
     <origin xyz="0.12 0 0.19"/>
   </joint>
 
-  <!-- Sensores Gazebo: todos possuem ruído gaussiano -->
+  <!-- Sensores Gazebo com ruido gaussiano -->
   <gazebo reference="imu_link">
     <sensor name="imu_sensor" type="imu">
       <always_on>true</always_on><update_rate>100</update_rate><visualize>true</visualize>
@@ -158,7 +158,7 @@
         <linear_acceleration><noise type="gaussian"><mean>0.0</mean><stddev>0.02</stddev></noise></linear_acceleration>
       </imu>
       <plugin name="imu_plugin" filename="libgazebo_ros_imu_sensor.so">
-        <ros><remapping>~/out:=imu/data</remapping></ros>
+        <topicName>imu/data</topicName>
         <frame_name>imu_link</frame_name>
       </plugin>
     </sensor>
@@ -174,7 +174,7 @@
         </position_sensing>
       </gps>
       <plugin name="gps_plugin" filename="libgazebo_ros_gps_sensor.so">
-        <ros><remapping>~/out:=gps/fix</remapping></ros>
+        <topicName>gps/fix</topicName>
         <frame_name>gps_link</frame_name>
       </plugin>
     </sensor>
@@ -189,7 +189,8 @@
         <noise type="gaussian"><mean>0.0</mean><stddev>0.01</stddev></noise>
       </camera>
       <plugin name="camera_plugin" filename="libgazebo_ros_camera.so">
-        <ros><remapping>image_raw:=camera/image_raw</remapping><remapping>camera_info:=camera/camera_info</remapping></ros>
+        <imageTopicName>camera/image_raw</imageTopicName>
+        <cameraInfoTopicName>camera/camera_info</cameraInfoTopicName>
         <camera_name>front_camera</camera_name><frame_name>camera_link</frame_name>
       </plugin>
     </sensor>
@@ -204,7 +205,7 @@
         <noise type="gaussian"><mean>0.0</mean><stddev>0.01</stddev></noise>
       </ray>
       <plugin name="lidar_plugin" filename="libgazebo_ros_ray_sensor.so">
-        <ros><remapping>~/out:=scan</remapping></ros>
+        <topicName>scan</topicName>
         <output_type>sensor_msgs/PointCloud2</output_type><frame_name>lidar_link</frame_name>
       </plugin>
     </sensor>

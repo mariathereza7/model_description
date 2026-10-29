@@ -2,7 +2,7 @@ import math
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist, PoseStamped
-from nav_msgs.msg import Odometry
+from nav_msgs.msg import Odometry, Path
 
 class TrajectoryNode(Node):
     def __init__(self):
@@ -28,6 +28,11 @@ class TrajectoryNode(Node):
         self.sub_odom = self.create_subscription(Odometry, '/odom', self.odom_cb, 10)
         self.pub_cmd = self.create_publisher(Twist, '/cmd_vel', 10)
         self.pub_ref_pose = self.create_publisher(PoseStamped, '/ref_pose', 10)
+        self.pub_ref_path = self.create_publisher(Path, '/trajectory_reference', 10)
+        self.declare_parameter('max_path_length', 2000)
+        self.max_path_length = int(self.get_parameter('max_path_length').value)
+        self.reference_path = Path()
+        self.reference_path.header.frame_id = 'odom'
 
         self.t = 0.0
         self.dt = 0.05 # 20 Hz
@@ -54,6 +59,23 @@ class TrajectoryNode(Node):
         ddyd = -2 * self.B * (self.W**2) * math.sin(2 * self.W * self.t)
 
         thetad = math.atan2(dyd, dxd)
+
+        # Publica a referência desejada para visualização e comparação com a odometria.
+        ref = PoseStamped()
+        ref.header.stamp = self.get_clock().now().to_msg()
+        ref.header.frame_id = 'odom'
+        ref.pose.position.x = xd
+        ref.pose.position.y = yd
+        ref.pose.position.z = 0.0
+        ref.pose.orientation.z = math.sin(thetad / 2.0)
+        ref.pose.orientation.w = math.cos(thetad / 2.0)
+        self.pub_ref_pose.publish(ref)
+
+        self.reference_path.header.stamp = ref.header.stamp
+        self.reference_path.poses.append(ref)
+        if len(self.reference_path.poses) > self.max_path_length:
+            self.reference_path.poses = self.reference_path.poses[-self.max_path_length:]
+        self.pub_ref_path.publish(self.reference_path)
         
         # 2. Termos Feedforward (Malha Aberta)
         v_ff = math.sqrt(dxd**2 + dyd**2)

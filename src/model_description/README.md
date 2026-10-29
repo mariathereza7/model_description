@@ -115,13 +115,13 @@ Observe os comandos gerados:
 ros2 topic echo /diff_drive_base_controller/cmd_vel_unstamped
 ```
 
-Os ganhos e limites do controlador estão em:
+Os ganhos PID e limites do controlador estão em:
 
 ```text
 src/model_description/model_description/src/meu_robo_control/config/controller_params.yaml
 ```
 
-O controlador atual é proporcional com saturação de velocidade. Para cumprir estritamente a exigência de uma biblioteca PID, é necessário substituir ou estender essa implementação com um controlador PID e documentar seus ganhos no YAML.
+O controlador usa a classe `PID` do módulo reutilizável `meu_robo_control/pid_controller.py`. Ela implementa termos proporcional, integral e derivativo, limites de saída e anti-windup. Os valores `kp_*`, `ki_*` e `kd_*` são carregados do YAML pelo `pose_control_node`.
 
 ## Exercício 1.1 — Bônus: três manobras
 
@@ -221,7 +221,7 @@ ros2 run meu_robo_control trajectory_node --ros-args \
   -r /cmd_vel:=/diff_drive_base_controller/cmd_vel_unstamped
 ```
 
-O nó limita os comandos a `0.6 m/s` e `1.5 rad/s`. A publicação de uma referência em `/ref_pose` deve ser adicionada ao nó para permitir a comparação automática da trajetória desejada e real no PlotJuggler.
+O nó limita os comandos a `0.6 m/s` e `1.5 rad/s`. Ele publica a referência instantânea em `/ref_pose` para o PlotJuggler e o histórico acumulado em `/trajectory_reference` (`nav_msgs/msg/Path`) para o RViz2.
 
 ## Exercício 2.2 — PlotJuggler
 
@@ -256,7 +256,7 @@ Para a missão, compare:
 /goal_pose → pose → position → x/y
 ```
 
-Para a trajetória, compare a odometria com `/ref_pose`. Se `/ref_pose` não aparecer, a referência ainda não está sendo publicada pelo `trajectory_node`.
+Para a trajetória, compare a odometria com `/ref_pose` no PlotJuggler ou use `/trajectory_reference` no display `Path` do RViz2.
 
 ## Bônus — RMSE
 
