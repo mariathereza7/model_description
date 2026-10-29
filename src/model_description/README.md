@@ -258,6 +258,65 @@ Para a missão, compare:
 
 Para a trajetória, compare a odometria com `/ref_pose` no PlotJuggler ou use `/trajectory_reference` no display `Path` do RViz2.
 
+### Visualizar a trajetória em oito no RViz2
+
+O `trajectory_node` publica o histórico da referência desejada em:
+
+```text
+/trajectory_reference
+```
+
+Esse tópico usa `nav_msgs/msg/Path` e desenha o oito diretamente no RViz2.
+
+Inicie o Gazebo e a trajetória:
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+
+ros2 launch model_description full_robot.launch.py
+```
+
+Em outro terminal:
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+
+ros2 launch meu_robo_control trajectory.launch.py
+```
+
+Confirme a publicação:
+
+```bash
+ros2 topic type /trajectory_reference
+ros2 topic hz /trajectory_reference
+```
+
+Os resultados esperados são `nav_msgs/msg/Path` e aproximadamente 20 Hz.
+
+Abra o RViz2:
+
+```bash
+rviz2
+```
+
+Configure `Global Options` com:
+
+```text
+Fixed Frame: odom
+```
+
+Depois clique em `Add`, escolha `By display type` e adicione `Path`. No campo `Topic`, selecione:
+
+```text
+/trajectory_reference
+```
+
+Defina `Alpha` como `1.0`, escolha uma cor visível e use `Line Width` próximo de `0.03`. Adicione também um display `Grid`, selecione `Plane: XY` e use `Cell Size: 1`. Para centralizar, clique com o botão direito na área 3D e escolha `Focus Camera`.
+
+O display `Path` mostra o oito desejado no plano XY. A odometria real continua disponível em `/diff_drive_base_controller/odom` e pode ser comparada no PlotJuggler.
+
 ## Bônus — RMSE
 
 Colete os dados de cada execução no PlotJuggler ou em um rosbag e calcule:
