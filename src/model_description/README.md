@@ -301,6 +301,128 @@ Não execute os dois ao mesmo tempo. Compare no PlotJuggler:
 
 Os principais critérios experimentais são o tempo total da missão, o erro de posição e orientação em cada waypoint, a velocidade máxima, a distância percorrida, a quantidade de paradas e a suavidade dos comandos.
 
+## Prática — Filtro de Kalman e controle usando estado estimado
+
+### Exercício 1.1 — Estimando estados com o filtro de Kalman
+
+Foi adicionada uma configuração do `robot_localization` com um filtro EKF em duas dimensões. O filtro combina:
+
+- odometria das rodas em `/diff_drive_base_controller/odom`;
+- orientação e velocidade angular da IMU em `/imu/data`.
+
+O estado estimado é publicado em:
+
+```text
+/odometry/filtered
+```
+
+Ele contém a pose estimada `(x, y, yaw)` e as velocidades filtradas. A configuração está em:
+
+```text
+src/model_description/model_description/src/meu_robo_control/config/ekf.yaml
+```
+
+Compile o pacote de controle:
+
+```bash
+source /opt/ros/humble/setup.bash
+cd ~/ros2_ws
+colcon build \
+  --base-paths src/model_description/model_description/src/meu_robo_control \
+  --packages-select meu_robo_control \
+  --symlink-install
+source install/setup.bash
+```
+
+Com o Gazebo e os controladores em execução, inicie o EKF em outro terminal:
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+ros2 launch meu_robo_control ekf.launch.py
+```
+
+Verifique a publicação e a taxa:
+
+```bash
+ros2 topic type /odometry/filtered
+ros2 topic hz /odometry/filtered
+ros2 topic echo /odometry/filtered --once
+```
+
+O tipo esperado é `nav_msgs/msg/Odometry`. Para observar os dados usados pelo filtro:
+
+```bash
+ros2 topic hz /diff_drive_base_controller/odom
+ros2 topic hz /imu/data
+```
+
+O pacote `robot_localization` precisa estar instalado:
+
+```bash
+sudo apt update
+sudo apt install ros-humble-robot-localization
+```
+
+### Exercício 2.1 — Trajetória em oito usando o estado estimado
+
+Foi criado o launch `trajectory_estimated.launch.py`, que inicia o EKF e remapeia a entrada de odometria do `trajectory_node` para `/odometry/filtered`.
+
+O experimento final deverá comparar no PlotJuggler:
+
+```text
+Estado real: ground truth publicado pelo Gazebo
+Estado bruto: /diff_drive_base_controller/odom
+Estado estimado: /odometry/filtered
+Trajetória desejada: /ref_pose ou /trajectory_reference
+```
+
+Para executar a trajetória com o estado estimado:
+
+```bash
+ros2 launch meu_robo_control trajectory_estimated.launch.py
+```
+
+O launch normal continua usando a odometria bruta para comparação:
+
+```bash
+ros2 launch meu_robo_control trajectory.launch.py
+```
+
+Para aumentar o ruído, ajuste os valores `stddev` das tags de ruído da IMU, GPS, câmera ou lidar em `urdf/robot.urdf`, recompile `model_description` e reinicie o Gazebo. Registre os quatro estados no PlotJuggler para comparar o efeito do ruído e da filtragem.
+
+Para o experimento temporário com ruído aumentado, o URDF está usando atualmente:
+
+```text
+IMU orientação:             stddev = 0.03
+IMU velocidade angular:     stddev = 0.08
+IMU aceleração linear:      stddev = 0.15
+GPS horizontal:             stddev = 3.0 m
+GPS vertical:               stddev = 5.0 m
+```
+
+Recompile e reinicie a simulação para aplicar o perfil:
+
+```bash
+source /opt/ros/humble/setup.bash
+cd ~/ros2_ws
+colcon build \
+  --base-paths src/model_description/model_description \
+  --packages-select model_description \
+  --symlink-install
+source install/setup.bash
+```
+
+Depois compare no PlotJuggler:
+
+```text
+Estado bruto:    /diff_drive_base_controller/odom
+Estado estimado: /odometry/filtered
+Referência:      /ref_pose ou /trajectory_reference
+```
+
+O EKF atual usa a odometria e a IMU. O GPS está com ruído aumentado para visualização, mas ainda não está incluído como entrada do EKF. Para retornar ao perfil original, restaure os `stddev` anteriores definidos na seção de sensores deste arquivo.
+
 ## Exercício 2.1 — Trajetória em oito
 
 O nó `trajectory_node` gera a trajetória paramétrica:
@@ -429,6 +551,27 @@ Os resultados esperados são `nav_msgs/msg/Path` e aproximadamente 20 Hz.
 Abra o RViz2:
 
 ```bash
+rviz2
+```
+
+Se a área 3D do RViz2 ficar preta, especialmente no WSLg, feche instâncias antigas e inicie o RViz2 com renderização por software:
+
+```bash
+pkill -f rviz2
+
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+export LIBGL_ALWAYS_SOFTWARE=1
+export LIBGL_DRI3_DISABLE=1
+export MESA_GL_VERSION_OVERRIDE=3.3
+
+rviz2
+```
+
+Se a configuração anterior estiver corrompida, inicie com uma configuração limpa, preservando o backup:
+
+```bash
+mv ~/.rviz2 /tmp/rviz2_backup
 rviz2
 ```
 
