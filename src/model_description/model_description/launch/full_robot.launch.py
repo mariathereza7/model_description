@@ -2,7 +2,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import LaunchConfiguration
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
@@ -12,12 +12,17 @@ def generate_launch_description():
     pkg_share = get_package_share_directory(package_name)
 
     urdf_file = os.path.join(pkg_share, 'urdf', 'robot.urdf')
+    urdf_no_noise_file = os.path.join(pkg_share, 'urdf', 'robot_no_noise.urdf')
     with open(urdf_file, 'r') as infp:
         robot_description_config = infp.read()
     # Resolve the package path before passing the plain URDF to Gazebo.
     robot_description_config = robot_description_config.replace(
         "$(find model_description)", get_package_share_directory(package_name)
     )
+    with open(urdf_no_noise_file, 'r') as infp:
+        robot_description_no_noise = infp.read().replace(
+            "$(find model_description)", get_package_share_directory(package_name))
+    sensor_noise = LaunchConfiguration('sensor_noise')
 
     # 1. Inicia o Gazebo Classic
     gazebo = IncludeLaunchDescription(
@@ -32,7 +37,13 @@ def generate_launch_description():
         package='robot_state_publisher',
         executable='robot_state_publisher',
         output='screen',
-        parameters=[{'robot_description': robot_description_config}]
+        parameters=[{'robot_description': robot_description_config}],
+        condition=IfCondition(sensor_noise),
+    )
+    robot_state_publisher_no_noise = Node(
+        package='robot_state_publisher', executable='robot_state_publisher',
+        output='screen', parameters=[{'robot_description': robot_description_no_noise}],
+        condition=UnlessCondition(sensor_noise),
     )
 
     # 3. Carrega o robô no Gazebo
@@ -40,7 +51,12 @@ def generate_launch_description():
         package='gazebo_ros',
         executable='spawn_entity.py',
         arguments=['-topic', 'robot_description', '-entity', 'meu_robo'],
-        output='screen'
+        output='screen', condition=IfCondition(sensor_noise)
+    )
+    spawn_entity_no_noise = Node(
+        package='gazebo_ros', executable='spawn_entity.py',
+        arguments=['-topic', 'robot_description', '-entity', 'meu_robo'],
+        output='screen', condition=UnlessCondition(sensor_noise)
     )
 
     # 4. Spawner do Joint State Broadcaster
@@ -71,9 +87,13 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('teleop', default_value='false',
                               description='Inicia o teleop em um xterm'),
+        DeclareLaunchArgument('sensor_noise', default_value='true',
+                              description='Ativa o ruído dos sensores do URDF'),
         gazebo,
         robot_state_publisher,
+        robot_state_publisher_no_noise,
         spawn_entity,
+        spawn_entity_no_noise,
         joint_state_broadcaster_spawner,
         diff_drive_spawner,
         teleop_keyboard

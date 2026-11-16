@@ -1,0 +1,21 @@
+trajectory_node:
+  ros__parameters:
+    A: 1.0
+    B: 2.0
+    omega: 0.5
+    open_loop: false
+    k_ff: 1.0
+    kp_x: 1.0
+    kp_y: 2.0
+    kp_theta: 2.0
+    ki_x: 0.0
+    ki_y: 0.0
+    ki_theta: 0.0
+    kd_x: 0.0
+    kd_y: 0.0
+    kd_theta: 0.0
+    integral_limit: 1.0
+    max_linear_speed: 1.2
+    max_angular_speed: 3.2
+    cmd_vel_topic: /diff_drive_base_controller/cmd_vel_unstamped
+    use_sim_time: true

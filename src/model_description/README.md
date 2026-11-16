@@ -20,18 +20,17 @@ source ~/ros2_ws/install/setup.bash
 
 ## Compilação
 
-O projeto atual possui os pacotes dentro de `src/model_description`. Por isso, compile usando os caminhos abaixo:
+O workspace consolidado usa um único pacote ROS 2: `meu_robo_control`.
+Ele contém o URDF, Gazebo, sensores, controllers, pose, missão, manobras, GPS,
+EKF, trajetória e RMSE.
+
+Compile somente esse pacote a partir de `~/ros2_ws`:
 
 ```bash
 source /opt/ros/humble/setup.bash
 cd ~/ros2_ws
 
-colcon build \
-  --base-paths src/model_description/model_description \
-  --packages-select model_description \
-  --symlink-install
-
-colcon build \
+colcon --log-base /tmp/ros2_ws_colcon_logs build \
   --base-paths src/model_description/model_description/src/meu_robo_control \
   --packages-select meu_robo_control \
   --symlink-install
@@ -39,14 +38,28 @@ colcon build \
 source install/setup.bash
 ```
 
+Confirme a instalação:
+
+```bash
+ros2 pkg executables meu_robo_control
+ls install/meu_robo_control/share/meu_robo_control/urdf/robot_no_noise.urdf
+ls install/meu_robo_control/share/meu_robo_control/config/trajectory_params.yaml
+```
+
 ## Inicialização do Gazebo
 
-Em um terminal, inicie o mundo padrão e o robô `meu_robo`:
+Em um terminal, inicie o mundo padrão, o robô `meu_robo` e os controllers:
 
 ```bash
 source /opt/ros/humble/setup.bash
 source ~/ros2_ws/install/setup.bash
-ros2 launch model_description full_robot.launch.py
+ros2 launch meu_robo_control full_robot.launch.py
+```
+
+Por padrão, o robô é iniciado com ruído nos sensores. Para iniciar sem ruído:
+
+```bash
+ros2 launch meu_robo_control full_robot.launch.py sensor_noise:=false
 ```
 
 O launch inicia o Gazebo, publica o URDF, cria o robô e ativa:
@@ -57,7 +70,7 @@ O launch inicia o Gazebo, publica o URDF, cria o robô e ativa:
 O teleop fica desativado por padrão. Para iniciar o teclado, use:
 
 ```bash
-ros2 launch model_description full_robot.launch.py teleop:=true
+ros2 launch meu_robo_control full_robot.launch.py teleop:=true
 ```
 
 Não execute teleop junto com os nós de missão ou trajetória, pois todos publicam comandos de velocidade.
@@ -81,39 +94,93 @@ Verifique a odometria:
 ros2 topic echo /diff_drive_base_controller/odom --once
 ```
 
-### Alternativa para WSL ou problemas gráficos
-
-Se a janela do Gazebo ficar preta, vazia ou se houver mais de uma instância antiga do servidor, encerre os processos antes de iniciar:
+Após essa etapa, execute somente um controlador de movimento por vez. Por
+exemplo, para a trajetória em oito:
 
 ```bash
-pkill -f gzclient
-pkill -f gzserver
-pkill -f spawner
+ros2 launch meu_robo_control trajectory.launch.py
 ```
 
-Inicie somente o servidor Gazebo, sem a interface gráfica:
+Para a trajetória com fusão opcional de sensores:
+
+```bash
+ros2 launch meu_robo_control trajectory_estimated.launch.py \
+  use_sensor_fusion:=true
+```
+
+Sem influência dos sensores, usando a odometria direta:
+
+```bash
+ros2 launch meu_robo_control trajectory_estimated.launch.py \
+  use_sensor_fusion:=false
+```
+
+### Alternativa para WSL ou problemas gráficos
+
+Se a janela do Gazebo ficar preta, vazia, o `gzclient` fechar ou houver mais de
+uma instância antiga do servidor, use primeiro este ambiente:
 
 ```bash
 source /opt/ros/humble/setup.bash
 source ~/ros2_ws/install/setup.bash
 
-ros2 launch model_description full_robot.launch.py gui:=false
+export ROS_LOCALHOST_ONLY=1
+export GAZEBO_IP=127.0.0.1
+export GAZEBO_MASTER_URI=http://127.0.0.1:11345
+export LIBGL_ALWAYS_SOFTWARE=1
+export ROS_LOG_DIR=/tmp/ros_logs
+export GAZEBO_LOG_PATH=/tmp/gazebo_logs
+
+mkdir -p "$ROS_LOG_DIR" "$GAZEBO_LOG_PATH" "$HOME/.gazebo"
+
+pkill -x gzclient 2>/dev/null || true
+pkill -x gzserver 2>/dev/null || true
+pkill -x spawner 2>/dev/null || true
 ```
 
-O terminal deve informar que o robô foi criado e que os dois controladores foram ativados. Em outro terminal, abra apenas o cliente gráfico com renderização por software:
+Inicie somente o servidor Gazebo e o robô, sem a interface gráfica:
 
 ```bash
 source /opt/ros/humble/setup.bash
-export GAZEBO_MASTER_URI=http://localhost:11345
+source ~/ros2_ws/install/setup.bash
+
+ros2 launch meu_robo_control full_robot.launch.py \
+  gui:=false \
+  sensor_noise:=false
+```
+
+O terminal deve informar que o robô foi criado e que os dois controllers foram
+ativados. Em outro terminal, abra apenas o cliente gráfico com renderização por
+software:
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+export GAZEBO_MASTER_URI=http://127.0.0.1:11345
 export LIBGL_ALWAYS_SOFTWARE=1
 
 gzclient --verbose
 ```
 
+Se quiser testar com ruído, troque `sensor_noise:=false` por:
+
+```bash
+sensor_noise:=true
+```
+
+Para testar apenas o servidor e ignorar completamente o OpenGL, mantenha o
+`gui:=false` e verifique em outro terminal:
+
+```bash
+ros2 service list | grep spawn
+ros2 control list_controllers
+ros2 topic info /diff_drive_base_controller/odom -v
+```
+
 Confirme que há somente um servidor ativo:
 
 ```bash
-pgrep -af gzserver
+pgrep -af 'gzserver|gzclient'
 ```
 
 Se o comando retornar mais de um processo, encerre as instâncias antigas e repita o procedimento. Essa alternativa separa problemas do servidor Gazebo de problemas de renderização do `gzclient` no WSLg.
@@ -175,8 +242,8 @@ source /opt/ros/humble/setup.bash
 cd ~/ros2_ws
 
 colcon build \
-  --base-paths src/model_description/model_description \
-  --packages-select model_description \
+  --base-paths src/model_description/model_description/src/meu_robo_control \
+  --packages-select meu_robo_control \
   --symlink-install
 
 colcon build \
@@ -192,7 +259,7 @@ Em um primeiro terminal, inicie o Gazebo e os controladores:
 ```bash
 source /opt/ros/humble/setup.bash
 source ~/ros2_ws/install/setup.bash
-ros2 launch model_description full_robot.launch.py
+ros2 launch meu_robo_control full_robot.launch.py
 ```
 
 Confirme que os controladores estão ativos:
@@ -389,7 +456,7 @@ O launch normal continua usando a odometria bruta para comparação:
 ros2 launch meu_robo_control trajectory.launch.py
 ```
 
-Para aumentar o ruído, ajuste os valores `stddev` das tags de ruído da IMU, GPS, câmera ou lidar em `urdf/robot.urdf`, recompile `model_description` e reinicie o Gazebo. Registre os quatro estados no PlotJuggler para comparar o efeito do ruído e da filtragem.
+Para aumentar o ruído, ajuste os valores `stddev` das tags de ruído da IMU, GPS, câmera ou lidar em `urdf/robot.urdf`, recompile `meu_robo_control` e reinicie o Gazebo. Registre os quatro estados no PlotJuggler para comparar o efeito do ruído e da filtragem.
 
 Para o experimento temporário com ruído aumentado, o URDF está usando atualmente:
 
@@ -407,8 +474,8 @@ Recompile e reinicie a simulação para aplicar o perfil:
 source /opt/ros/humble/setup.bash
 cd ~/ros2_ws
 colcon build \
-  --base-paths src/model_description/model_description \
-  --packages-select model_description \
+  --base-paths src/model_description/model_description/src/meu_robo_control \
+  --packages-select meu_robo_control \
   --symlink-install
 source install/setup.bash
 ```
@@ -527,7 +594,7 @@ Inicie o Gazebo e a trajetória:
 source /opt/ros/humble/setup.bash
 source ~/ros2_ws/install/setup.bash
 
-ros2 launch model_description full_robot.launch.py
+ros2 launch meu_robo_control full_robot.launch.py
 ```
 
 Em outro terminal:
@@ -622,7 +689,7 @@ Se o robô não aparecer, encerre instâncias antigas e inicie novamente:
 ```bash
 pkill -f gzclient
 pkill -f gzserver
-ros2 launch model_description full_robot.launch.py
+ros2 launch meu_robo_control full_robot.launch.py
 ```
 
 ## Prática 04 — Sensores
@@ -656,8 +723,8 @@ Compile novamente o pacote depois de alterar o URDF:
 source /opt/ros/humble/setup.bash
 cd ~/ros2_ws
 colcon build \
-  --base-paths src/model_description/model_description \
-  --packages-select model_description \
+  --base-paths src/model_description/model_description/src/meu_robo_control \
+  --packages-select meu_robo_control \
   --symlink-install
 source install/setup.bash
 ```
@@ -667,7 +734,7 @@ Reinicie o Gazebo para recarregar o modelo:
 ```bash
 pkill -f gzclient
 pkill -f gzserver
-ros2 launch model_description full_robot.launch.py
+ros2 launch meu_robo_control full_robot.launch.py
 ```
 
 Liste os tópicos dos sensores:
@@ -824,4 +891,101 @@ ros2 topic echo /gps/position_local
 ```
 
 Nesse frame ENU local, `X` é Leste, `Y` é Norte e `Z` é altitude relativa à origem, todos em metros.
+
+## Trajetória em oito e uso opcional dos sensores
+
+O ruído dos sensores também é opcional no launch do Gazebo. O arquivo
+`robot.urdf` mantém os níveis de ruído configurados; `robot_no_noise.urdf` usa
+os mesmos sensores com desvio padrão zero.
+
+Para iniciar o robô com ruído, que é o padrão:
+
+```bash
+ros2 launch meu_robo_control full_robot.launch.py sensor_noise:=true
+```
+
+Para iniciar o robô sem ruído:
+
+```bash
+ros2 launch meu_robo_control full_robot.launch.py sensor_noise:=false
+```
+
+O mesmo argumento está disponível no launch básico:
+
+```bash
+ros2 launch meu_robo_control gazebo.launch.py sensor_noise:=false
+```
+
+Essa opção escolhe o URDF no momento da criação do robô. Portanto, encerre a
+simulação atual e inicie uma nova para alternar entre os modos.
+
+O controlador da trajetória em oito está em `trajectory_node`. Os parâmetros da
+trajetória e do controlador ficam em:
+
+```text
+src/model_description/model_description/src/meu_robo_control/config/trajectory_params.yaml
+```
+
+Inicie a trajetória usando a odometria direta do controlador diferencial:
+
+```bash
+ros2 launch meu_robo_control trajectory.launch.py
+```
+
+Nesse modo, a pose usada pelo controlador vem de:
+
+```text
+/diff_drive_base_controller/odom
+```
+
+A IMU, o GPS, a câmera e o lidar não influenciam diretamente o controle.
+
+Para executar a versão com fusão de sensores pelo `robot_localization`/EKF:
+
+```bash
+ros2 launch meu_robo_control trajectory_estimated.launch.py \
+  use_sensor_fusion:=true
+```
+
+Nesse modo, a IMU e a odometria são combinadas pelo EKF, e o controlador usa:
+
+```text
+/odometry/filtered
+```
+
+Para executar o mesmo launch sem influência dos sensores, usando novamente a
+odometria direta:
+
+```bash
+ros2 launch meu_robo_control trajectory_estimated.launch.py \
+  use_sensor_fusion:=false
+```
+
+Resumo dos modos:
+
+| Comando | Pose usada pelo controlador | Sensores influenciam? |
+|---|---|---|
+| `trajectory.launch.py` | `/diff_drive_base_controller/odom` | Não |
+| `trajectory_estimated.launch.py use_sensor_fusion:=false` | `/diff_drive_base_controller/odom` | Não |
+| `trajectory_estimated.launch.py use_sensor_fusion:=true` | `/odometry/filtered` | Sim, via EKF |
+
+Durante a execução, compare os tópicos:
+
+```bash
+ros2 topic info /imu/data -v
+ros2 topic info /diff_drive_base_controller/odom -v
+ros2 topic info /odometry/filtered -v
+ros2 topic echo /ref_pose
+ros2 topic echo /real_pose
+```
+
+Para calcular o RMSE da trajetória, execute em outro terminal:
+
+```bash
+ros2 run meu_robo_control rmse_node
+```
+
+Não execute `trajectory.launch.py`, `trajectory_estimated.launch.py`,
+`mission.launch.py` e `maneuver_mission.launch.py` ao mesmo tempo, pois eles
+podem publicar comandos simultaneamente em `/cmd_vel`.
 
