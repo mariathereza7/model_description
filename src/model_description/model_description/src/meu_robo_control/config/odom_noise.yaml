@@ -1,0 +1,7 @@
+odom_noise_node:
+  ros__parameters:
+    input_topic: /diff_drive_base_controller/odom
+    output_topic: /odom_noisy
+    linear_stddev: 0.003
+    angular_stddev: 0.006
+    random_seed: 7

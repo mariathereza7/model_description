@@ -128,6 +128,8 @@ export ROS_LOCALHOST_ONLY=1
 export GAZEBO_IP=127.0.0.1
 export GAZEBO_MASTER_URI=http://127.0.0.1:11345
 export LIBGL_ALWAYS_SOFTWARE=1
+export LIBGL_DRI3_DISABLE=1
+export MESA_GL_VERSION_OVERRIDE=3.3
 export ROS_LOG_DIR=/tmp/ros_logs
 export GAZEBO_LOG_PATH=/tmp/gazebo_logs
 
@@ -145,6 +147,7 @@ source /opt/ros/humble/setup.bash
 source ~/ros2_ws/install/setup.bash
 
 ros2 launch meu_robo_control full_robot.launch.py \
+  world:=$(ros2 pkg prefix meu_robo_control)/share/meu_robo_control/worlds/slam_large.world \
   gui:=false \
   sensor_noise:=false
 ```
@@ -158,9 +161,16 @@ source /opt/ros/humble/setup.bash
 source ~/ros2_ws/install/setup.bash
 export GAZEBO_MASTER_URI=http://127.0.0.1:11345
 export LIBGL_ALWAYS_SOFTWARE=1
+export LIBGL_DRI3_DISABLE=1
+export MESA_GL_VERSION_OVERRIDE=3.3
 
 gzclient --verbose
 ```
+
+O `gzclient` deve ser iniciado em um segundo terminal, mantendo o mesmo
+`GAZEBO_MASTER_URI` do `gzserver`. Se a renderização continuar indisponível,
+use somente o primeiro terminal com `gui:=false`; o Gazebo, os controllers, os
+sensores e o SLAM continuarão funcionando sem a interface gráfica.
 
 Se quiser testar com ruído, troque `sensor_noise:=false` por:
 
@@ -988,4 +998,143 @@ ros2 run meu_robo_control rmse_node
 Não execute `trajectory.launch.py`, `trajectory_estimated.launch.py`,
 `mission.launch.py` e `maneuver_mission.launch.py` ao mesmo tempo, pois eles
 podem publicar comandos simultaneamente em `/cmd_vel`.
+
+## SLAM 2D e experimentos de ruído
+
+O Lidar 2D publica `sensor_msgs/LaserScan` em `/lidar_plugin/out` (tópico
+efetivamente gerado pelo plugin do Gazebo). O URDF
+`robot_no_noise.urdf` usa medições ideais; `robot.urdf` aplica ruído gaussiano
+ao Lidar. A odometria do controlador é relativa e ground truth do Gazebo. Para
+simular erro de dead reckoning, `odom_noise_node` adiciona ruído aos incrementos
+de odometria, sem usar GPS ou qualquer referência absoluta.
+
+Instale o SLAM Toolbox caso ainda não esteja disponível:
+
+```bash
+sudo apt update
+sudo apt install ros-humble-slam-toolbox
+```
+
+Use o cenário ampliado, com paredes externas e obstáculos distribuídos:
+
+Sempre reinicie os processos nesta ordem. Isso evita que o `slam_toolbox` use
+um relógio ou uma árvore TF antiga:
+
+```bash
+pkill -f rviz2
+pkill -f explorer_node
+pkill -f slam_toolbox
+pkill -f gzserver
+pkill -f ros2.launch
+```
+
+1. Inicie o Gazebo e o robô:
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+
+ros2 launch meu_robo_control full_robot.launch.py \
+  world:=$(ros2 pkg prefix meu_robo_control)/share/meu_robo_control/worlds/slam_large.world \
+  sensor_noise:=false \
+  gui:=false
+```
+
+2. Em um segundo terminal, inicie o SLAM:
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+
+ros2 launch meu_robo_control slam.launch.py odom_noise:=true
+```
+
+3. Em um terceiro terminal, inicie a exploração autônoma:
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+
+ros2 launch meu_robo_control explorer.launch.py
+```
+
+4. Somente depois abra o RViz2:
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+
+rviz2
+```
+
+No RViz2, configure `Fixed Frame` como `map` e adicione `/map`,
+`/lidar_plugin/out`, `TF` e `RobotModel`. Verifique a árvore antes de iniciar
+o experimento:
+
+```bash
+ros2 run tf2_ros tf2_echo map base_link
+```
+
+Deve existir continuamente a cadeia:
+
+```text
+map -> odom -> base_link -> lidar_link
+```
+
+Para comparar os três casos, mantenha a mesma ordem acima e altere apenas os
+parâmetros:
+
+```bash
+# 1) Lidar ideal + odometria ground truth
+sensor_noise:=false
+ros2 launch meu_robo_control slam.launch.py odom_noise:=false
+
+# 2) Lidar ruidoso + odometria ground truth
+# reinicie o Gazebo com sensor_noise:=true:
+ros2 launch meu_robo_control slam.launch.py odom_noise:=false
+
+# 3) Lidar ruidoso + odometria ruidosa
+ros2 launch meu_robo_control slam.launch.py odom_noise:=true
+```
+
+Nos casos 2 e 3, `sensor_noise:=true` deve ser usado ao iniciar o Gazebo. O
+caso 3 publica a odometria relativa ruidosa em `/odom_noisy`. O SLAM publica o
+mapa em `/map` e a transformação `map -> odom`.
+
+Para salvar o mapa construído:
+
+```bash
+ros2 run nav2_map_server map_saver_cli -f ~/mapa_slam
+```
+
+### Exploração autônoma
+
+O `explorer_node` movimenta o robô sem teclado usando somente o Lidar 2D. Ele
+avança, detecta obstáculos, gira para o lado com maior espaço e publica em
+`/diff_drive_base_controller/cmd_vel_unstamped`.
+
+Com o Gazebo e o SLAM já iniciados, execute:
+
+```bash
+ros2 launch meu_robo_control explorer.launch.py
+```
+
+Ou diretamente:
+
+```bash
+ros2 run meu_robo_control explorer_node \
+  --ros-args \
+  --params-file $(ros2 pkg prefix meu_robo_control)/share/meu_robo_control/config/explorer_params.yaml
+```
+
+Para interromper o mapeamento, use `Ctrl+C`; o nó envia velocidade zero ao
+finalizar. O mapa é atualizado enquanto o robô percorre o cenário.
+
+### Robô sequestrado
+
+Com o caso 3 em execução e o mapa visível no RViz, pause o Gazebo pelo botão
+Pause. Selecione o modelo `meu_robo` na interface, use a ferramenta de
+translação e mova-o para o outro lado do mapa. Retome a simulação. O SLAM deve
+relocalizar o robô por correspondência entre `/lidar_plugin/out` e o mapa; a recuperação é
+avaliada observando a transformação `map -> odom`, não uma posição GPS.
 

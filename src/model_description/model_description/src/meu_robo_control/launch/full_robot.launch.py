@@ -24,13 +24,15 @@ def generate_launch_description():
         robot_description_no_noise = infp.read().replace(
             "$(find meu_robo_control)", get_package_share_directory(package_name))
     sensor_noise = LaunchConfiguration('sensor_noise')
+    world = LaunchConfiguration('world')
+    gui = LaunchConfiguration('gui')
 
     # 1. Inicia o Gazebo Classic
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             os.path.join(get_package_share_directory('gazebo_ros'), 'launch', 'gazebo.launch.py')
         ]),
-        launch_arguments={'server_required': 'true'}.items(),
+        launch_arguments={'server_required': 'true', 'world': world, 'gui': gui}.items(),
     )
 
     # 2. Publica o robot_description
@@ -113,6 +115,11 @@ def generate_launch_description():
                               description='Inicia o teleop em um xterm'),
         DeclareLaunchArgument('sensor_noise', default_value='true',
                               description='Ativa o ruído dos sensores do URDF'),
+        DeclareLaunchArgument('world', default_value=os.path.join(
+            get_package_share_directory('gazebo_ros'), 'worlds', 'empty.world'),
+                              description='Mundo Gazebo opcional para SLAM'),
+        DeclareLaunchArgument('gui', default_value='true',
+                              description='Inicia o gzclient'),
         gazebo,
         robot_state_publisher,
         robot_state_publisher_no_noise,

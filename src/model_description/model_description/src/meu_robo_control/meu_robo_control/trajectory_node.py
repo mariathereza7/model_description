@@ -37,6 +37,8 @@ class TrajectoryNode(Node):
 
         self.x = self.y = self.theta = 0.0
         self.have_odom = False
+        self.origin_x = None
+        self.origin_y = None
         lim = self.get_parameter('integral_limit').value
         self.pid_x = PID(self.get_parameter('kp_x').value, self.get_parameter('ki_x').value, self.get_parameter('kd_x').value, lim)
         self.pid_y = PID(self.get_parameter('kp_y').value, self.get_parameter('ki_y').value, self.get_parameter('kd_y').value, lim)
@@ -65,6 +67,12 @@ class TrajectoryNode(Node):
         self.y = msg.pose.pose.position.y
         self.theta = yaw_from_quaternion(msg.pose.pose.orientation)
         self.have_odom = True
+        # A missão deve começar e terminar no ponto onde o robô estava
+        # quando o controlador foi iniciado, e não necessariamente em (0, 0)
+        # absoluto do frame odom.
+        if self.origin_x is None:
+            self.origin_x = self.x
+            self.origin_y = self.y
 
     def loop(self):
         now = self.get_clock().now()
@@ -79,8 +87,10 @@ class TrajectoryNode(Node):
         self.t = elapsed
 
         # 1. Referência em oito: x=A sin(wt), y=B/2 sin(2wt).
-        xd = self.A * math.sin(self.W * self.t)
-        yd = (self.B / 2.0) * math.sin(2 * self.W * self.t)
+        ox = self.origin_x if self.origin_x is not None else 0.0
+        oy = self.origin_y if self.origin_y is not None else 0.0
+        xd = ox + self.A * math.sin(self.W * self.t)
+        yd = oy + (self.B / 2.0) * math.sin(2 * self.W * self.t)
         
         dxd = self.A * self.W * math.cos(self.W * self.t)
         dyd = self.B * self.W * math.cos(2 * self.W * self.t)

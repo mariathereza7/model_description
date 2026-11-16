@@ -1,0 +1,16 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <world name="slam_large">
+    <include><uri>model://ground_plane</uri></include>
+    <include><uri>model://sun</uri></include>
+    <model name="north_wall"><static>true</static><link name="link"><collision name="c"><geometry><box><size>14 .15 1</size></box></geometry><pose>0 5 .5 0 0 0</pose></collision><visual name="v"><geometry><box><size>14 .15 1</size></box></geometry><pose>0 5 .5 0 0 0</pose></visual></link></model>
+    <model name="south_wall"><static>true</static><link name="link"><collision name="c"><geometry><box><size>14 .15 1</size></box></geometry><pose>0 -5 .5 0 0 0</pose></collision><visual name="v"><geometry><box><size>14 .15 1</size></box></geometry><pose>0 -5 .5 0 0 0</pose></visual></link></model>
+    <model name="east_wall"><static>true</static><link name="link"><collision name="c"><geometry><box><size>.15 10 1</size></box></geometry><pose>7 0 .5 0 0 0</pose></collision><visual name="v"><geometry><box><size>.15 10 1</size></box></geometry><pose>7 0 .5 0 0 0</pose></visual></link></model>
+    <model name="west_wall"><static>true</static><link name="link"><collision name="c"><geometry><box><size>.15 10 1</size></box></geometry><pose>-7 0 .5 0 0 0</pose></collision><visual name="v"><geometry><box><size>.15 10 1</size></box></geometry><pose>-7 0 .5 0 0 0</pose></visual></link></model>
+    <model name="obstacle_nw"><static>true</static><link name="link"><collision name="c"><geometry><box><size>2.2 .8 1</size></box></geometry><pose>-4 2.8 .5 0 0 .15</pose></collision><visual name="v"><geometry><box><size>2.2 .8 1</size></box></geometry><pose>-4 2.8 .5 0 0 .15</pose></visual></link></model>
+    <model name="obstacle_ne"><static>true</static><link name="link"><collision name="c"><geometry><box><size>.9 2.5 1</size></box></geometry><pose>3.5 2.7 .5 0 0 -.25</pose></collision><visual name="v"><geometry><box><size>.9 2.5 1</size></box></geometry><pose>3.5 2.7 .5 0 0 -.25</pose></visual></link></model>
+    <model name="obstacle_west"><static>true</static><link name="link"><collision name="c"><geometry><box><size>.8 2.4 1</size></box></geometry><pose>-4.8 -.8 .5 0 0 .1</pose></collision><visual name="v"><geometry><box><size>.8 2.4 1</size></box></geometry><pose>-4.8 -.8 .5 0 0 .1</pose></visual></link></model>
+    <model name="obstacle_south"><static>true</static><link name="link"><collision name="c"><geometry><box><size>2.5 .8 1</size></box></geometry><pose>1.8 -3 .5 0 0 -.2</pose></collision><visual name="v"><geometry><box><size>2.5 .8 1</size></box></geometry><pose>1.8 -3 .5 0 0 -.2</pose></visual></link></model>
+    <model name="obstacle_east"><static>true</static><link name="link"><collision name="c"><geometry><box><size>.8 2 1</size></box></geometry><pose>5 -1 .5 0 0 .3</pose></collision><visual name="v"><geometry><box><size>.8 2 1</size></box></geometry><pose>5 -1 .5 0 0 .3</pose></visual></link></model>
+  </world>
+</sdf>

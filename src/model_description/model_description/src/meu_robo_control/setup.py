@@ -16,6 +16,7 @@ setup(
         (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
         (os.path.join('share', package_name, 'urdf'), glob('urdf/*.urdf')),
+        (os.path.join('share', package_name, 'worlds'), glob('worlds/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -32,6 +33,8 @@ setup(
             'gps_to_local_node = meu_robo_control.gps_to_local_node:main',
             'maneuver_pose_node = meu_robo_control.maneuver_pose_node:main',
             'rmse_node = meu_robo_control.rmse_node:main',
+            'odom_noise_node = meu_robo_control.odom_noise_node:main',
+            'explorer_node = meu_robo_control.explorer_node:main',
         ],
     },
 )
